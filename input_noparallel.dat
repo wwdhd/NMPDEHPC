@@ -1,0 +1,6 @@
+--------------input parameters-----------
+1000		!number of grid points
+5.0		!final time
+0.8		!cfl number
+5		!numerical method
+---------------------------------------

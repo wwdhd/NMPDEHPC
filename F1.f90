@@ -21,7 +21,13 @@ REAL,ALLOCATABLE, DIMENSION(:)::X !COORDINATES FOR EACH GRID POINT
 REAL, ALLOCATABLE, DIMENSION (:,:)::FI !SOLUTION SCALAR
 INTEGER::I       !LOOP COUNTER
 INTEGER::SCHEME  !SCHEME (CHOSEN BY USER)
-REAL:: EPS = 1e-6, alpha(3), beta(3), w(3), sum_w, omega(3) !WENO SCHEME
+!WENO SCHEME
+REAL, ALLOCATABLE, DIMENSION (:,:)::FI_H1, FI_H2, FI_H3 !WENO HALF INCREMENT SOLUTION SCALAR
+REAL, ALLOCATABLE, DIMENSION (:,:)::B_1, B_2, B_3 !BETA COEFFICIENT
+REAL, ALLOCATABLE, DIMENSION (:,:)::wtil_1, wtil_2, wtil_3 !OMEGA TILDE WEIGHTING
+REAL, ALLOCATABLE, DIMENSION (:,:)::w_1, w_2, w_3 !OMEGA WEIGHTING
+REAL:: G(3)    !GAMMA COEFFICIENT
+REAL:: EPS     !EPSILON
 
 !ANALYTICAL METHOD
 REAL,ALLOCATABLE, DIMENSION(:)::X_A !COORDINATES FOR EACH GRID POINT
@@ -93,7 +99,6 @@ END DO
 !Analytical Solution
 ALLOCATE(X_A(0:points-1)); X_A=0.0D0
 ALLOCATE(FI_A(0:points-1,1:2)); FI_A=0.0D0
-ALLOCATE(LINF(0:points,1:2)); LINF=0.0D0
 
 X_A(0)=LB
 X_A(POINTS-1)=RB
@@ -308,62 +313,81 @@ else if (scheme == 4) then
 
 else if(scheme == 5) then
 print*,"Using WENO Scheme"
+   !Additional Memory Allocation
+   ALLOCATE(FI_H1(0:points-1,1:2)); FI_H1=0.0D0
+   ALLOCATE(FI_H2(0:points-1,1:2)); FI_H2=0.0D0
+   ALLOCATE(FI_H3(0:points-1,1:2)); FI_H3=0.0D0
+   
+   ALLOCATE(B_1(0:points-1,1:2)); B_1=0.0D0
+   ALLOCATE(B_2(0:points-1,1:2)); B_2=0.0D0
+   ALLOCATE(B_3(0:points-1,1:2)); B_3=0.0D0
+   
+   ALLOCATE(wtil_1(0:points-1,1:2)); wtil_1=0.0D0
+   ALLOCATE(wtil_2(0:points-1,1:2)); wtil_2=0.0D0
+   ALLOCATE(wtil_3(0:points-1,1:2)); wtil_3=0.0D0
+   
+   ALLOCATE(w_1(0:points-1,1:2)); w_1=0.0D0
+   ALLOCATE(w_2(0:points-1,1:2)); w_2=0.0D0
+   ALLOCATE(w_3(0:points-1,1:2)); w_3=0.0D0
+   
+   G(1) = 1/16
+   G(2) = 5/8
+   G(3) = 5/16
+   
+   EPS = 1e-6
+   
    T_C=0.0			!current time
-   open(31,file="L1_WENO_F1.dat", form="formatted",status="replace")
-
    do 	!start time loop
+
 	dt=min(dt,t_end-t_c)
-	print*,t_c,dt
 
-   	do i=2,points-2
-   	!compute the smoothness indicators
-  	alpha(1) = FI(i+1,1)-FI(i,1)**2
-  	alpha(2) = FI(i,1)-FI(i-1,1)**2
-   	alpha(3) = FI(i+2,1)-FI(i-1,1)**2
-
-   	!compute the smoothness indicators
-   	beta(1) = (eps + alpha(1))**(-2)
-   	beta(2) = (eps + alpha(2))**(-2)
-   	beta(3) = (eps + alpha(3))**(-2)
-
-   	!compute the linear weights
-   	w(1) = beta(1) / (beta(1) + beta(2) + beta(3))
-   	w(2) = beta(2) / (beta(1) + beta(2) + beta(3))
-   	w(3) = beta(3) / (beta(1) + beta(2) + beta(3))
-
-   	!Smoothness Measures
-   	sum_w = w(1) + w(2) + w(3)
-   	omega (1) = w(1) / sum_w
-   	omega (2) = w(2) / sum_w
-   	omega (3) = w(3) / sum_w
-
-	!Compute the numerical flux using WENO scheme
-	fi(i+0.5,2)=omega(1)*(fi(i+1,1)-fi(i,1))+omega(2)*(fi(i,1)-fi(i-1,1))+omega(3)*(fi(i-1,1)-fi(i-2,1))
-
-	!Update the function
-	fi(i+0.5,2)=0.5*(fi(i+0.5,2)+sign(1.0,fi(i+0.5,2))*sqrt(abs(fi(i+0.5,2)**2+eps)))
-
-	!Compute the numerical flux using WENO Scheme with limited derivatives
-	fi(i+1,2)=fi(i,1)+dx/dt*(fi(i+0.5,2)-fi(i-0.5,2))
-        !Compute the errors
-	L1 = dx*sum(abs(fi-fi_a))
-	L2 = sqrt(dx*sum((fi-fi_a)**2))
-	Linfmax = maxval(Linf(:,1))
-	WRITE(31,*)t_c,L1
-   	end do
-
-   !current time update
-   t_c=t_c+dt
-
-   !update solution (next time level copied to current)
-   fi(:,1)=fi(:,2)
-
-   if (t_c.ge.t_end)then
-	exit		!exit loop
-	end if
+	!WENO-Scheme
+	!Polynomial Construction
+	do i=2,points-3
+	FI_H1(i,1) = (3/8)*FI(i-2,1)-(5/4)*FI(i-1,1)+(15/8)*FI(i,1)
+	FI_H2(i,1) = (-1/8)*FI(i-1,1)+(3/4)*FI(i,1)+(3/8)*FI(i+1,1)
+	FI_H3(i,1) = (3/8)*FI(i,1)+(3/4)*FI(i+1,1)-(1/8)*FI(i+2,1)
 	
-end do
-print*,"Using WENO Scheme"
+	!Calculate Beta
+	B_1(i,1) = 1.0/3.0 * (4 * FI(i-2,1)**2 - 19 * FI(i-2,1) * FI(i-1,1) + 25 * FI(i-1,1)**2 + &
+                     11 * FI(i-2,1) * FI(i,1) - 31 * FI(i-1,1) * FI(i,1) + 10 * FI(i,1)**2)
+
+	B_2(i,1) = 1.0/3.0 * (4 * FI(i-1,1)**2 - 13 * FI(i-1,1) * FI(i,1) + 13 * FI(i,1)**2 + &
+                     5 * FI(i-1,1) * FI(i+1,1) - 13 * FI(i,1) * FI(i+1,1) + 4 * FI(i+1,1)**2)
+
+	B_3(i,1) = 1.0/3.0 * (10 * FI(i,1)**2 - 31 * FI(i,1) * FI(i+1,1) + 25 * FI(i+1,1)**2 + &
+                     11 * FI(i,1) * FI(i+2,1) - 19 * FI(i+1,1) * FI(i+2,1) + 4 * FI(i+2,1)**2)
+                     
+        !Omega Tilde Non-Linear Weights
+        wtil_1(i,1)=G(1)/(EPS+B_1(i,1))
+        wtil_2(i,1)=G(2)/(EPS+B_2(i,1))
+        wtil_3(i,1)=G(3)/(EPS+B_3(i,1))
+        
+        !Calculate Omega Weight
+        w_1(i,1)=wtil_1(i,1)/(wtil_1(i,1)+wtil_2(i,1)+wtil_3(i,1))
+        w_2(i,1)=wtil_2(i,1)/(wtil_1(i,1)+wtil_2(i,1)+wtil_3(i,1))
+        w_3(i,1)=wtil_3(i,1)/(wtil_1(i,1)+wtil_2(i,1)+wtil_3(i,1))
+        
+        !Half-Points
+        FI(i+1/2,1)=w_1(i,1)*FI_H1(i,1) + w_2(i,1)*FI_H2(i,1) + w_3(i,1)*FI_H3(i,1)
+        
+        FI(i,2) = FI(i,2)-u*(dt/dx)*(FI(i+1/2,1)-FI(i-1/2,1))
+	end do
+	!current time update
+	t_c=t_c+dt
+
+	!update solution (next time level copied to current)
+	fi(:,1)=fi(:,2)
+	
+	
+	!Compute the errors
+
+	print*,t_c,dt,L1,L2,Linfmax
+	if (t_c.ge.t_end)then
+		exit		!exit loop
+	end if
+   end do 
+
 
 !write final solution
    open(31,file="final_WENO_F1.dat", form="formatted",status="replace")

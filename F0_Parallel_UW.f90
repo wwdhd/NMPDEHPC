@@ -119,7 +119,7 @@ do 	!start time loop
  
 	! Start timer for time-step computation
     	t_start_computation = MPI_Wtime()
-	!FTCS scheme
+	!Upwind scheme
 	do i=istart, iend-1
 		fi(i,2)=fi(i,1)-((U*dt/dx)*(fi(i,1)-fi(i-1,1)))
 	end do

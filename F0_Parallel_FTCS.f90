@@ -86,40 +86,37 @@ do 	!start time loop
 	dt=min(dt,t_end-t_c)
 	! Start timer for boundary exchange
     	t_start_exchange = MPI_Wtime()
-	!Multiprocessing start
+!Multiprocessing start
 	!Rank 0
-	if(my_rank == 0) then
-		x(0) = -10.0d0
-		FI(0,1) = 0
-		sentinfo0 = FI(iend, 1)
-		call MPI_SEND(sentinfo0, 1, MPI_COMPLEX, 1, 1, MPI_COMM_WORLD, ierr) !Send to 1
-		call MPI_RECV(sentinfo0, 1, MPI_COMPLEX, 1, 2, MPI_COMM_WORLD, status14, ierr) !Rec from 1
-		FI(iend+1,1)=sentinfo0
-	end if
+    if (my_rank == 0) then
+		x(0) = -10.0D0
+		FI(0,1) = 0.0D0
+        call mpi_send(fi(iend,1),1,mpi_complex,1,23,mpi_comm_world, ierr)
+        call mpi_recv(fi(iend+1,1),1,mpi_complex, 1, 55, mpi_comm_world, status14, ierr)
+
+    end if
+
 	!Rank between 0 and ncp-1
-	if(my_rank > 0 .and. my_rank < n_cpus-1) then
-		call MPI_RECV(sentinfo1, 1, MPI_COMPLEX, my_rank-1, 1, MPI_COMM_WORLD, status14, ierr) !Request to left
-		FI(istart-1,1) = sentinfo1
-		sentinfo1 = FI(iend+1,1)
-		call MPI_SEND(sentinfo1, 1, MPI_COMPLEX, my_rank+1, 1, MPI_COMM_WORLD, ierr) !Send to right
-		sentinfo1 = FI(istart,1)
-		call MPI_SEND(sentinfo1, 1, MPI_COMPLEX, my_rank-1, 2, MPI_COMM_WORLD, ierr) !Send to left
-		call MPI_RECV(sentinfo1, 1, MPI_COMPLEX, my_rank+1, 2, MPI_COMM_WORLD, status14, ierr) !Rec from right
-		FI(iend+1,1) = sentinfo1
-	end if
+    if(my_rank > 0 .and. my_rank < n_cpus - 1)then
+
+        call mpi_recv(fi(istart-1,1),1,mpi_complex, my_rank-1, 23, mpi_comm_world, status14, ierr)
+        call mpi_send(fi(iend,1),1,mpi_complex,my_rank+1,23,mpi_comm_world, ierr)
+        call mpi_send(fi(istart,1),1, mpi_complex,my_rank-1,55,mpi_comm_world,ierr)
+        call mpi_recv(fi(iend+1,1),1,mpi_complex,my_rank+1,55,mpi_comm_world, status14,ierr)
+
+    end if
+
 	!If rank=ncp-1
-	if(my_rank == n_cpus-1) then
-		x(iend+1) = 10.0d0
-		FI(iend+1,1) = 0
-		FI(istart-1,1) = sentinfo2
-		call MPI_RECV(sentinfo2, 1, MPI_COMPLEX, my_rank-1, 1, MPI_COMM_WORLD, status14, ierr) !Rec from left
- 		sentinfo2 = FI(istart,1)
-		call MPI_SEND(sentinfo2, 1, MPI_COMPLEX, my_rank-1, 2, MPI_COMM_WORLD, ierr) !Send to left
-	end if
-	! End timer for boundary exchange
-    	t_end_exchange = MPI_Wtime()	
-	t_exchange = t_end_exchange - t_start_exchange
+        if (my_rank == n_cpus-1) then
+        x(iend+1) = 10.0d0
+		FI(iend+1,1) = 0.0D0
+        call mpi_recv(fi(istart-1,1),1,mpi_complex, my_rank-1, 23, mpi_comm_world, status14, ierr)
+        call mpi_send(fi(istart,1),1,mpi_complex,my_rank-1,55,mpi_comm_world, ierr)
+
+    end if
+
 	call mpi_barrier(MPI_COMM_WORLD, ierr)
+ 
 	! Start timer for time-step computation
     	t_start_computation = MPI_Wtime()
 	!FTCS scheme

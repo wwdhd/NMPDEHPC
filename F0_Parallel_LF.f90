@@ -119,7 +119,7 @@ do 	!start time loop
  
 	! Start timer for time-step computation
     	t_start_computation = MPI_Wtime()
-	!FTCS scheme
+	!Lax-Friedrichs scheme
 	do i=istart, iend-1
 		fi(i,2)=0.5*((u*fi(i+1,1))+(u*fi(i-1,1)))-(u*dt/(2*dx))*(fi(i+1,1)-fi(i-1,1))
 	end do

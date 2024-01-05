@@ -140,7 +140,7 @@ do 	!start time loop
 	print*, 'Time Spent in Boundary Exchange:', t_exchange
 	print*, 'Time Spent in time-step computation:', t_computation
 	print*, X, FI
-		exit		!exit loop
+		exit		!exit loopa
 	end if
 end do
 open(unit=31, file='output.dat', status="replace")

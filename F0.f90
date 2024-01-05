@@ -83,7 +83,7 @@ DO I=1,points-1
 	FI_A(I,1)=sin(2*pi*(x(I)-1*t_end))
 END DO
 
-open(32,file="f0_analytical.dat", form="formatted",status="replace")
+open(32,file="f0_analytical_1600.dat", form="formatted",status="replace")
 DO I=0,POINTS-1
 	WRITE(32,*)X(I), FI_A(I,1)
 END DO
@@ -98,11 +98,55 @@ T_C=0.0			!current time
   DO
   	! Ensure the time step does not exceed the final time level
   	DT = MIN(DT, T_END - T_C)
-	OPEN(31, file="L2_ftcs_f0.dat", form="formatted")
+	OPEN(31, file="L1_ftcs_f0_1600.dat", form="formatted")
 
   	! FTCS Scheme
   	DO I = 1, POINTS-1
    		fi(i,2)=fi(i,1)-(0.5*U*dt/dx)*(fi(i+1,1)-fi(i-1,1))
+		l1_norm = sum(abs(fi(:,2)-fi_a(:,1)))
+		l2_norm = sqrt(sum((fi(:, 2) - fi_a(:, 1))**2))
+    		linf_norm = maxval(abs(fi(:, 2) - fi_a(:, 1)))
+	END DO
+	fi(0,2)=fi(points-1,2)
+	
+	! Write the output to the file
+    	WRITE(31, *) t_c, l1_norm
+	
+
+  	! Current time update
+  	t_c = t_c + dt
+
+  	! Update solution (next time level copied to current)
+  	fi(:, 1) = fi(:, 2)
+
+	print*,t_c,dt,l1_norm,l2_norm,linf_norm
+
+  	! If the final time level is reached, exit the loop
+  	if (t_c.ge.t_end)then
+	CLOSE(31)
+		exit		!exit loop
+	end if
+   END DO
+print*,"FTCS was used"
+
+
+! Write the final solution to the output file
+OPEN(31, file="f0_ftcs_1600.dat", form="formatted", status="replace")
+DO I = 0, POINTS-1
+  WRITE(31, *) X(I), FI(I, 1)
+END DO
+ CLOSE(31)
+
+else if (scheme==2) then
+T_C=0.0			!current time
+  DO
+  	! Ensure the time step does not exceed the final time level
+  	DT = MIN(DT, T_END - T_C)
+	OPEN(31, file="L2_uw_f0_1600.dat", form="formatted")
+
+  	! Upwind Scheme
+  	DO I = 1, POINTS-1
+   		fi(i,2)=fi(i,1)-((U*dt/dx)*(fi(i,1)-fi(i-1,1)))
 		l1_norm = sum(abs(fi(:,2)-fi_a(:,1)))
 		l2_norm = sqrt(sum((fi(:, 2) - fi_a(:, 1))**2))
     		linf_norm = maxval(abs(fi(:, 2) - fi_a(:, 1)))
@@ -127,55 +171,11 @@ T_C=0.0			!current time
 		exit		!exit loop
 	end if
    END DO
-print*,"FTCS was used"
-
-
-! Write the final solution to the output file
-OPEN(31, file="f0_ftcs_400.dat", form="formatted", status="replace")
-DO I = 0, POINTS-1
-  WRITE(31, *) X(I), FI(I, 1)
-END DO
- CLOSE(31)
-
-else if (scheme==2) then
-T_C=0.0			!current time
-  DO
-  	! Ensure the time step does not exceed the final time level
-  	DT = MIN(DT, T_END - T_C)
-	OPEN(31, file="Linf_uw_f0.dat", form="formatted")
-
-  	! Upwind Scheme
-  	DO I = 1, POINTS-1
-   		fi(i,2)=fi(i,1)-((U*dt/dx)*(fi(i,1)-fi(i-1,1)))
-		l1_norm = sum(abs(fi(:,2)-fi_a(:,1)))
-		l2_norm = sqrt(sum((fi(:, 2) - fi_a(:, 1))**2))
-    		linf_norm = maxval(abs(fi(:, 2) - fi_a(:, 1)))
-	END DO
-	fi(0,2)=fi(points-1,2)
-	
-	! Write the output to the file
-    	WRITE(31, *) t_c, linf_norm
-	
-
-  	! Current time update
-  	t_c = t_c + dt
-
-  	! Update solution (next time level copied to current)
-  	fi(:, 1) = fi(:, 2)
-
-	print*,t_c,dt,l1_norm,l2_norm,linf_norm
-
-  	! If the final time level is reached, exit the loop
-  	if (t_c.ge.t_end)then
-	CLOSE(31)
-		exit		!exit loop
-	end if
-   END DO
 print*,"Upwind was used"
 
 
 ! Write the final solution to the output file
-OPEN(31, file="f0_uw_400.dat", form="formatted", status="replace")
+OPEN(31, file="f0_uw_1600.dat", form="formatted", status="replace")
 DO I = 0, POINTS-1
   WRITE(31, *) X(I), FI(I, 1)
 END DO
@@ -187,14 +187,14 @@ else if(scheme == 3) then
   DO
   	! Ensure the time step does not exceed the final time level
   	DT = MIN(DT, T_END - T_C)
-	OPEN(31, file="Linf_lf_f0.dat", form="formatted")
+	OPEN(31, file="Linf_lf_f0_1600.dat", form="formatted")
 
   	! Lax-Friedrichs Scheme
   	DO I = 1, POINTS-1
    		fi(i,2)=0.5*((u*fi(i+1,1))+(u*fi(i-1,1)))-(u*dt/(2*dx))*(fi(i+1,1)-fi(i-1,1))
 		l1_norm = sum(abs(fi(:,2)-fi_a(:,1)))
 		l2_norm = sqrt(sum((fi(:, 2) - fi_a(:, 1))**2))
-    		linf_norm = maxval(abs(fi(:, 2) - fi_a(:, 1)))S
+    		linf_norm = maxval(abs(fi(:, 2) - fi_a(:, 1)))
 	END DO
 	fi(0,2)=fi(points-1,2)
 	
@@ -220,7 +220,7 @@ print*,"Lax-Friedrichs was used"
   
 
 ! Write the final solution to the output file
-OPEN(31, file="f0_lf_400.dat", form="formatted", status="replace")
+OPEN(31, file="f0_lf_1600.dat", form="formatted", status="replace")
 DO I = 0, POINTS-1
   WRITE(31, *) X(I), FI(I, 1)
 END DO
@@ -233,7 +233,7 @@ else if(scheme == 4) then
   DO
   	! Ensure the time step does not exceed the final time level
   	DT = MIN(DT, T_END - T_C)
-	OPEN(31, file="L2_lw_f0.dat", form="formatted")
+	OPEN(31, file="Linf_lw_f0_1600.dat", form="formatted")
 
   	! Lax-Wendroff Scheme
   	DO I = 1, POINTS-1
@@ -246,7 +246,7 @@ else if(scheme == 4) then
 	fi(0,2)=fi(points-1,2)
 	
 	! Write the output to the file
-    	WRITE(31, *) t_c, l2_norm
+    	WRITE(31, *) t_c, linf_norm
 	
 
   	! Current time update
@@ -267,7 +267,7 @@ print*,"Lax-Wendroff was used"
 
 
 ! Write the final solution to the output file
-OPEN(31, file="f0_lw_400.dat", form="formatted", status="replace")
+OPEN(31, file="f0_lw_1600.dat", form="formatted", status="replace")
 DO I = 0, POINTS-1
   WRITE(31, *) X(I), FI(I, 1)
 END DO
@@ -303,4 +303,3 @@ write(*,*)"Elapsed time: ", elapsed_time, "seconds"
 
 
 END PROGRAM LINEAR1
-
